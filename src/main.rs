@@ -57,7 +57,7 @@ impl App {
 			The actual period is however more than 6 seconds
 		*/
 
-		let ang_acc = - 50.0 * pendulum.angle.to_radians();
+		let ang_acc = - 50.0 * pendulum.angle.to_radians().sin();
 		pendulum.ang_vel += ang_acc * dt;
 		pendulum.angle += pendulum.ang_vel * dt;
 	}
