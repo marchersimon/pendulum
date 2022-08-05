@@ -23,7 +23,7 @@ pub struct App {
 }
 
 impl App {
-	fn render(&mut self, args: &RenderArgs, pendulum: &Pendulum) {
+	fn render(&mut self, args: &RenderArgs, pendulums: &Vec<Pendulum>) {
 		use graphics::*;
 
 		const RED:   [f32; 4] = [1.0 , 0.0 , 0.0 , 1.0];
@@ -32,34 +32,22 @@ impl App {
 		self.gl.draw(args.viewport(), |c, gl| {
 			clear(GREY, gl);
 
-			let circle = ellipse::circle(0.0,pendulum.l,20.0);
-			ellipse(RED, circle, c.transform.trans(200.0,100.0).rot_deg(pendulum.angle), gl);
-			line(RED, 1.0, [0.0, 0.0, 0.0, pendulum.l], c.transform.trans(200.0,100.0).rot_deg(pendulum.angle), gl); // first rot_deg()) then trans()
+			for pendulum in pendulums {
+				let circle = ellipse::circle(0.0,pendulum.l*100.0,20.0);
+				ellipse(RED, circle, c.transform.trans(200.0,100.0).rot_rad(pendulum.angle), gl);
+				line(RED, 1.0, [0.0, 0.0, 0.0, pendulum.l*100.0], c.transform.trans(200.0,100.0).rot_rad(pendulum.angle), gl); // first rot_rad()) then trans()
+			}
 		});
 	}
 
-	fn update(&mut self, args: &UpdateArgs, pendulum: &mut Pendulum, last_update: &mut std::time::SystemTime) {
-		// args.dt is always 0.0083333, which is only correct if this function's execution time is neglegible
-		// so I'm doing my own dt
-		// I sampled all dt's for 1 second and they do actually add up to 1
-		let now = std::time::SystemTime::now();
-		let dt = now.duration_since(*last_update).unwrap().as_secs_f64();
-		*last_update = now;
+	fn update(&mut self, args: &UpdateArgs, pendulums: &mut Vec<Pendulum>) {
 
-		/*
-			Equation of motion for the pendulum:
-				a = -g/l * sin(ϕ)
-
-			Equation for the period of the pendulum:
-				T = 2π * √(l/g)
-
-			I set g/l = 50, so T should be 2π*√(1/50) = 0.89 seconds
-			The actual period is however more than 6 seconds
-		*/
-
-		let ang_acc = - 50.0 * pendulum.angle.to_radians().sin();
-		pendulum.ang_vel += ang_acc * dt;
-		pendulum.angle += pendulum.ang_vel * dt;
+		for pendulum in pendulums {
+			let ang_acc = - 9.81 / pendulum.l * pendulum.angle.sin();
+			pendulum.ang_vel += ang_acc * args.dt;
+			pendulum.ang_vel *= 1.0 - 0.10 * args.dt; // the pendulum loses 10% speed per second
+			pendulum.angle += pendulum.ang_vel * args.dt;
+		}
 	}
 }
 
@@ -78,18 +66,19 @@ fn main() {
 		gl: GlGraphics::new(opengl),
 	};
 
-	let mut pendulum = Pendulum { angle: 30.0, ang_vel: 0.0, l: 223.0 };
-
-	let mut last_update = std::time::SystemTime::now();
+	let mut pendulums = vec![
+		Pendulum { angle: 30.0_f64.to_radians(), ang_vel: 0.0, l: 1.4 },
+		Pendulum { angle: -20.0_f64.to_radians(), ang_vel: 2.0, l: 2.242}
+	];
 
 	let mut events = Events::new(EventSettings::new());
 	while let Some(e) = events.next(&mut window) {
 		if let Some(args) = e.render_args() {
-			app.render(&args, &pendulum);
+			app.render(&args, &pendulums);
 		}
 
 		if let Some(args) = e.update_args() {
-			app.update(&args, &mut pendulum, &mut last_update);
+			app.update(&args, &mut pendulums);
 		}
 
 	}
